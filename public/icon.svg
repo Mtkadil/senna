@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Dark-metallic gold gradient for background -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%" fx="50%" fy="30%">
+      <stop offset="0%" stop-color="#1c1917" />
+      <stop offset="100%" stop-color="#0c0a09" />
+    </radialGradient>
+    
+    <!-- Premium Gold gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF3B0" />
+      <stop offset="30%" stop-color="#D4AF37" />
+      <stop offset="70%" stop-color="#AA7C11" />
+      <stop offset="100%" stop-color="#F3E5AB" />
+    </linearGradient>
+
+    <!-- Chrome gold for border -->
+    <linearGradient id="borderGrad" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#B38728" />
+      <stop offset="50%" stop-color="#FCF6BA" />
+      <stop offset="100%" stop-color="#D4AF37" />
+    </linearGradient>
+
+    <!-- Red/Blue Barber colors -->
+    <linearGradient id="barberRed" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ef4444" />
+      <stop offset="100%" stop-color="#991b1b" />
+    </linearGradient>
+    <linearGradient id="barberBlue" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1e3a8a" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="512" height="512" rx="110" fill="url(#bgGrad)" />
+  
+  <!-- Outer Gold Border -->
+  <rect x="20" y="20" width="472" height="472" rx="90" fill="none" stroke="url(#borderGrad)" stroke-width="8" opacity="0.85" />
+  
+  <!-- Inner Subtle Ring -->
+  <circle cx="256" cy="256" r="190" fill="none" stroke="url(#goldGrad)" stroke-width="2" opacity="0.3" stroke-dasharray="10 6" />
+
+  <!-- The Crown Symbol (The Prince) -->
+  <path d="M 176,190 
+           L 206,230 
+           L 256,170 
+           L 306,230 
+           L 336,190 
+           L 326,270 
+           L 186,270 Z" 
+        fill="url(#goldGrad)" />
+  
+  <!-- Crown Base Jewels -->
+  <ellipse cx="256" cy="280" rx="70" ry="6" fill="#D4AF37" opacity="0.6" />
+  <circle cx="256" cy="162" r="8" fill="#FFF" />
+  <circle cx="176" cy="182" r="6" fill="#FFF" />
+  <circle cx="336" cy="182" r="6" fill="#FFF" />
+
+  <!-- Diagonal Barber Pole and Currency Emblem Core -->
+  <g transform="translate(196, 295)">
+    <!-- Barber pole elements (Vertical or slanted lines) -->
+    <rect x="10" y="10" width="100" height="90" rx="10" fill="#111" stroke="url(#goldGrad)" stroke-width="3" />
+    
+    <!-- Slanted Stripes -->
+    <clipPath id="innerRectClip">
+      <rect x="12" y="12" width="96" height="86" rx="8" />
+    </clipPath>
+    
+    <g clip-path="url(#innerRectClip)">
+      <path d="M -20,120 L 120,-20" stroke="url(#barberRed)" stroke-width="16" />
+      <path d="M 10,120 L 150,-20" stroke="#fff" stroke-width="16" />
+      <path d="M 40,120 L 180,-20" stroke="url(#barberBlue)" stroke-width="16" />
+      <path d="M 70,120 L 210,-20" stroke="#fff" stroke-width="16" />
+    </g>
+
+    <!-- Cash Simbolo Overlaid € -->
+    <circle cx="60" cy="55" r="32" fill="#000" opacity="0.8" stroke="url(#goldGrad)" stroke-width="2" />
+    <text x="60" y="65" font-family="'Inter', sans-serif" font-weight="900" font-size="34" fill="url(#goldGrad)" text-anchor="middle">€</text>
+  </g>
+
+  <!-- Glowing Accent Spot -->
+  <circle cx="256" cy="130" r="140" fill="#FFF" opacity="0.03" filter="blur(20px)" />
+</svg>

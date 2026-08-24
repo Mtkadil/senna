@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cinzel", "Georgia", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-gold-light: #fcf6ba;
+  --color-gold-primary: #d4af37;
+  --color-gold-dark: #aa7c11;
+  --color-matte-black: #050505;
+}
+
+/* Custom CSS Scrollbar or visual details */
+body {
+  background-color: #050505;
+  color: #F5F5F7;
+  font-family: var(--font-sans);
+}
+
+.gold-gradient-bg {
+  background: linear-gradient(135deg, #bf953f 0%, #fcf6ba 25%, #b38728 50%, #fbf5b7 75%, #aa7c11 100%);
+  background-size: 200% 200%;
+}
+
+.gold-text-gradient {
+  background: linear-gradient(135deg, #bf953f 0%, #fcf6ba 50%, #aa7c11 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}

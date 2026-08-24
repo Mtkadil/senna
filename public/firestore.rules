@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net: Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Functions ---
+
+    function isValidId(id) {
+      return id is string && id.size() <= 64 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validations ---
+
+    function isValidChair(data) {
+      return data.total is number && data.total >= 0 && data.total <= 10000000
+        && (!data.keys().contains('updatedAt') || data.updatedAt == request.time || data.updatedAt == null)
+        && (!data.keys().contains('history') || (
+            data.history is list 
+            && data.history.size() <= 600
+        ));
+    }
+
+    // --- Rules for collections ---
+
+    match /chairs/{chairId} {
+      allow read: if isValidId(chairId);
+      allow create, update: if isValidId(chairId) && isValidChair(incoming());
+    }
+
+    match /settings/{docId} {
+      // Allow general read & write of settings docs for local PIN authenticated users
+      allow read, write: if isValidId(docId);
+    }
+
+    match /notifications/{docId} {
+      allow read, write: if true;
+    }
+
+    match /reports/{docId} {
+      allow read, write: if true;
+    }
+
+    match /admins/{userId} {
+      allow read, write: if true;
+    }
+  }
+}

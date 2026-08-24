@@ -1,0 +1,8 @@
+{
+  "name": "Senna",
+  "description": "Premium real-time financial tracking dashboard for l barbershops and salons.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

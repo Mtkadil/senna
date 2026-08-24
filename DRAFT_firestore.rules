@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper function to validate chair IDs
+    function isValidId(id) {
+      return id is string && id.size() <= 6 && (id == "chair1" || id == "chair2" || id == "chair3" || id == "chair4");
+    }
+
+    // Reference helpers
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Helper to validate the chair entity structure and data types
+    function isValidChair(data) {
+      return data.total is number 
+        && data.total >= 0 
+        && data.total <= 1000000;
+    }
+
+    match /chairs/{chairId} {
+      // Allow read to the standard 4 chairs
+      allow read: if isValidId(chairId);
+
+      // Allow creating chair documents only if the ID is valid and the schema is strictly followed
+      allow create: if isValidId(chairId) 
+        && isValidChair(incoming())
+        && (
+          incoming().keys().size() == 1 
+          || (incoming().keys().size() == 2 && incoming().updatedAt == request.time)
+        );
+
+      // Allow updating chair documents only if the ID is valid and the schema/totals are strictly validated
+      allow update: if isValidId(chairId) 
+        && isValidChair(incoming())
+        && (
+          incoming().keys().size() == 1 
+          || (incoming().keys().size() == 2 && incoming().updatedAt == request.time)
+        );
+    }
+  }
+}

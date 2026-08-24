@@ -1,0 +1,135 @@
+{
+  "entities": {
+    "Chair": {
+      "title": "Chair",
+      "description": "Represents a barber chair and its live cash total for the day.",
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "number",
+          "description": "The current daily cash total of the chair."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp of the last update (Server Timestamp)."
+        },
+        "history": {
+          "type": "array",
+          "description": "The transaction history of the day (last 500 items).",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "amount": { "type": "number" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            },
+            "required": ["id", "amount", "timestamp"]
+          }
+        }
+      },
+      "required": ["total"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Represents an authorized administrator with full system access.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email"]
+    },
+    "SettingsPins": {
+      "title": "SettingsPins",
+      "description": "Represents the security configuration PINs for access control.",
+      "type": "object",
+      "properties": {
+        "owner": { "type": "string", "description": "4-digit PIN code for owner" },
+        "chair1": { "type": "string", "description": "4-digit PIN code for Chair 1" },
+        "chair2": { "type": "string", "description": "4-digit PIN code for Chair 2" },
+        "chair3": { "type": "string", "description": "4-digit PIN code for Chair 3" },
+        "chair4": { "type": "string", "description": "4-digit PIN code for Chair 4" }
+      },
+      "required": ["owner", "chair1", "chair2", "chair3", "chair4"]
+    },
+    "BarberNames": {
+      "title": "BarberNames",
+      "description": "Represents custom display names for each barber chair.",
+      "type": "object",
+      "properties": {
+        "chair1": { "type": "string" },
+        "chair2": { "type": "string" },
+        "chair3": { "type": "string" },
+        "chair4": { "type": "string" }
+      },
+      "required": ["chair1", "chair2", "chair3", "chair4"]
+    },
+    "PriceList": {
+      "title": "PriceList",
+      "description": "A list of service prices available for selection.",
+      "type": "object",
+      "properties": {
+        "list": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string" },
+              "amount": { "type": "number" }
+            },
+            "required": ["id", "label", "amount"]
+          }
+        }
+      },
+      "required": ["list"]
+    },
+    "AppConfig": {
+      "title": "AppConfig",
+      "description": "Global application feature toggles and settings.",
+      "type": "object",
+      "properties": {
+        "notificationsEnabled": { "type": "boolean" },
+        "autoExportEnabled": { "type": "boolean" },
+        "exportTime": { "type": "string" },
+        "features": { "type": "object", "additionalProperties": { "type": "boolean" } }
+      },
+      "required": ["notificationsEnabled", "autoExportEnabled", "exportTime", "features"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "A system notification entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "read": { "type": "boolean" },
+        "type": { "type": "string", "enum": ["info", "success", "warning", "error"] }
+      },
+      "required": ["id", "title", "message", "timestamp", "read", "type"]
+    }
+  },
+  "firestore": {
+    "admins/{userId}": {
+      "schema": "Admin",
+      "description": "The collection of authorized administrators (Google Auth UIDs)."
+    },
+    "chairs/{chairId}": {
+      "schema": "Chair",
+      "description": "The collection of barber chairs tracking live revenue."
+    },
+    "settings/{docId}": {
+      "description": "Global custom configurations such as password PINs, barber names, prices, and app config."
+    },
+    "reports/{docId}": {
+      "description": "Historical reports exported daily."
+    },
+    "notifications/{docId}": {
+      "schema": "AppNotification",
+      "description": "Real-time system notifications for the admin."
+    }
+  }
+}
