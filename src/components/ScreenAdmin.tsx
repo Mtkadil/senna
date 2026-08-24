@@ -269,7 +269,7 @@ export default function ScreenAdmin({
           },
           body: JSON.stringify({
             properties: {
-              title: `Zmegri - Registro Incassi`
+              title: `Senna - Registro Incassi`
             }
           })
         });
@@ -369,7 +369,7 @@ export default function ScreenAdmin({
 
       // 4. Prepare data rows for todayTabName
       const rows = [
-        ['ZMEGRI - Report Cassa'],
+        ['SENNA - Report Cassa'],
         [`Esportato il:`, `${today} alle ${new Date().toLocaleTimeString('it-IT')}`],
         [''],
         ['RIASSUNTO INCASSI'],
@@ -408,7 +408,7 @@ export default function ScreenAdmin({
 
       // 5. Prepare data rows for "Totale Poltrone" (summary tab)
       const summaryRows = [
-        ['ZMEGRI - RIEPILOGO POLTRONE / BARBIERI'],
+        ['SENNA - RIEPILOGO POLTRONE / BARBIERI'],
         [`Ultimo Aggiornamento:`, `${today} alle ${new Date().toLocaleTimeString('it-IT')}`],
         [''],
         ['TABELLA RIASSUNTIVA INCASSI'],
@@ -557,7 +557,7 @@ export default function ScreenAdmin({
     const todayTimeStr = new Date().toLocaleTimeString('it-IT');
     
     let csvContent = `sep=;\n`;
-    csvContent += `ZMEGRI - Report Cassa\n`;
+    csvContent += `SENNA - Report Cassa\n`;
     csvContent += `Esportato il:;${todayStr} alle ${todayTimeStr}\n\n`;
     
     csvContent += `RIASSUNTO INCASSI\n`;
@@ -582,7 +582,7 @@ export default function ScreenAdmin({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `Zmegri_Report_${todayStr.replace(/\//g, '-')}.csv`);
+    link.setAttribute('download', `Senna_Report_${todayStr.replace(/\//g, '-')}.csv`);
     link.click();
     setShowResetAfterExportConfirm(true);
   };
@@ -646,7 +646,7 @@ export default function ScreenAdmin({
             </span>
           </div>
           <h2 className="font-serif text-3xl font-extrabold tracking-[2px] text-white uppercase flex items-center justify-center md:justify-start gap-2.5">
-            <span className="gold-text-gradient">ZMEGRI</span>
+            <span className="gold-text-gradient">SENNA</span>
             <span className="text-stone-500 font-light text-xl">| ADMIN</span>
           </h2>
         </div>

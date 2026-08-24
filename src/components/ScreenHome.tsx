@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { DollarSign, Eye } from 'lucide-react';
 // @ts-expect-error - image import handled by vite
-import logoImage from '../assets/images/zmegri_logo.png';
+import logoImage from '../assets/images/senna_barbershop_logo_1787613248874.jpg';
 
 interface ScreenHomeProps {
   onNavigate: (screen: 'selection-screen' | 'admin-dashboard') => void;
@@ -35,8 +35,8 @@ export default function ScreenHome({ onNavigate }: ScreenHomeProps) {
         >
           <img
             src={logoImage}
-            alt="Zmegri Logo"
-            className="h-28 w-auto object-contain brightness-110 select-none pointer-events-none"
+            alt="Senna Barbershop"
+            className="h-32 w-auto object-contain rounded-2xl brightness-105 select-none pointer-events-none"
             referrerPolicy="no-referrer"
           />
         </motion.div>

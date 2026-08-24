@@ -493,7 +493,7 @@ export default function App() {
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-8">
           <div>
             <h1 className="text-2xl md:text-3xl font-black tracking-[0.1em] uppercase mb-1 font-sans text-gold-primary">
-              Zmegri Barbershop
+              Senna Barbershop
             </h1>
             <p className="text-[9px] tracking-[0.3em] uppercase text-[#8E8E93]">
               digital book &bull; Management App
@@ -614,7 +614,7 @@ export default function App() {
         <footer className="flex flex-col sm:flex-row justify-between items-center gap-2 text-[9px] uppercase tracking-[0.3em] text-[#8E8E93] border-t border-[#ffffff]/10 pt-6 mt-8">
           <div className="text-stone-500 font-medium">Creato da Adil Mtk</div>
           <div className="flex gap-4">
-            <span>Device ID: ZMEGRI_01_X</span>
+            <span>Device ID: SENNA_01_X</span>
             <span className="hidden sm:inline">&bull;</span>
             <span>Secure Connection</span>
           </div>

@@ -2,7 +2,7 @@ import { motion } from 'motion/react';
 import { ArrowLeft, Scissors } from 'lucide-react';
 import { CHAIR_NAMES_MAP } from '../types';
 // @ts-expect-error - image import handled by vite
-import logoImage from '../assets/images/zmegri_logo.png';
+import logoImage from '../assets/images/senna_barbershop_logo_1787613248874.jpg';
 
 interface ScreenSelectionProps {
   barberNames: { [key: string]: string };
@@ -23,8 +23,8 @@ export default function ScreenSelection({ barberNames, onSelectChair, isAdminMod
       <div className="flex justify-center mb-4">
         <img
           src={logoImage}
-          alt="Zmegri"
-          className="h-16 w-auto object-contain brightness-110 filter hover:scale-105 transition-transform duration-300"
+          alt="Senna Barbershop"
+          className="h-20 w-auto object-contain rounded-2xl brightness-105 filter hover:scale-105 transition-transform duration-300"
           referrerPolicy="no-referrer"
         />
       </div>

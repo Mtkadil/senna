@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Lock, Delete, HelpCircle, CheckCircle2, AlertCircle } from 'lucide-react';
 // @ts-expect-error - image import handled by vite
-import logoImage from '../assets/images/zmegri_logo.png';
+import logoImage from '../assets/images/senna_barbershop_logo_1787613248874.jpg';
 import { CHAIR_NAMES_MAP } from '../types';
 
 interface ScreenLoginProps {
@@ -120,8 +120,8 @@ export default function ScreenLogin({ onLoginSuccess, pinsData, barberNames }: S
           <div className="relative p-2.5 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md shadow-[0_0_30px_rgba(215,180,60,0.1)]">
             <img
               src={logoImage}
-              alt="Zmegri Barber"
-              className="h-20 w-auto object-contain brightness-110 select-none pointer-events-none"
+              alt="Senna Barbershop"
+              className="h-24 w-auto object-contain rounded-2xl brightness-105 select-none pointer-events-none"
               referrerPolicy="no-referrer"
             />
           </div>
