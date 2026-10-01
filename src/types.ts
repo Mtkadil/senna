@@ -4,6 +4,15 @@ export interface Chair {
   total: number;
 }
 
+export interface TransactionItem {
+  id: string;
+  amount: number;
+  timestamp: string;
+  type?: string;
+  paymentMethod?: 'cash' | 'card';
+  updatedAt?: string;
+}
+
 export const CHAIR_NAMES_MAP: { [key: number]: string } = {
   1: 'Amine',
   2: 'Maher',

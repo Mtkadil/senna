@@ -427,6 +427,59 @@ export default function App() {
     }
   };
 
+  const handleDeleteTransaction = async (chairKey: string, transactionId: string) => {
+    const currentObj = chairsData[chairKey] || { total: 0, history: [] };
+    const historyList = currentObj.history || [];
+    const targetItem = historyList.find((item) => item.id === transactionId);
+    if (!targetItem) return;
+
+    const newHistory = historyList.filter((item) => item.id !== transactionId);
+    const newTotal = Math.max(0, currentObj.total - targetItem.amount);
+
+    try {
+      const chairRef = doc(db, 'chairs', chairKey);
+      await setDoc(chairRef, {
+        total: newTotal,
+        updatedAt: serverTimestamp(),
+        history: newHistory,
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `chairs/${chairKey}`);
+    }
+  };
+
+  const handleEditTransaction = async (chairKey: string, transactionId: string, newAmount: number) => {
+    if (isNaN(newAmount) || newAmount <= 0) return;
+    const currentObj = chairsData[chairKey] || { total: 0, history: [] };
+    const historyList = currentObj.history || [];
+    const targetItem = historyList.find((item) => item.id === transactionId);
+    if (!targetItem) return;
+
+    const diff = newAmount - targetItem.amount;
+    const newTotal = Math.max(0, currentObj.total + diff);
+    const newHistory = historyList.map((item) => {
+      if (item.id === transactionId) {
+        return {
+          ...item,
+          amount: newAmount,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return item;
+    });
+
+    try {
+      const chairRef = doc(db, 'chairs', chairKey);
+      await setDoc(chairRef, {
+        total: newTotal,
+        updatedAt: serverTimestamp(),
+        history: newHistory,
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `chairs/${chairKey}`);
+    }
+  };
+
   const handleUndoRecentTransaction = async () => {
     if (!selectedChair) return;
     const chairKey = `chair${selectedChair}`;
@@ -434,19 +487,8 @@ export default function App() {
     const historyList = currentObj.history || [];
     if (historyList.length === 0) return;
 
-    const [recentItem, ...remainingHistory] = historyList;
-    const newTotal = Math.max(0, currentObj.total - recentItem.amount);
-
-    try {
-      const chairRef = doc(db, 'chairs', chairKey);
-      await setDoc(chairRef, {
-        total: newTotal,
-        updatedAt: serverTimestamp(),
-        history: remainingHistory,
-      });
-    } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `chairs/${chairKey}`);
-    }
+    const [recentItem] = historyList;
+    await handleDeleteTransaction(chairKey, recentItem.id);
   };
 
   const handleResetDailyData = async () => {
@@ -542,7 +584,6 @@ export default function App() {
                   total={chairsData[`chair${selectedChair || 1}`]?.total || 0}
                   history={chairsData[`chair${selectedChair || 1}`]?.history || []}
                   onAddAmount={handleAddAmount}
-                  onUndoRecentTransaction={handleUndoRecentTransaction}
                   isAdminMode={false}
                   onExit={() => {}}
                 />
@@ -573,6 +614,8 @@ export default function App() {
                   history={chairsData[`chair${selectedChair}`]?.history || []}
                   onAddAmount={handleAddAmount}
                   onUndoRecentTransaction={handleUndoRecentTransaction}
+                  onDeleteTransaction={(txId) => handleDeleteTransaction(`chair${selectedChair}`, txId)}
+                  onEditTransaction={(txId, newAmount) => handleEditTransaction(`chair${selectedChair}`, txId, newAmount)}
                   isAdminMode={true}
                   onExit={() => {
                     setSelectedChair(null);
@@ -604,6 +647,8 @@ export default function App() {
                   onUpdateAppConfig={handleUpdateAppConfig}
                   notifications={notifications}
                   onClearNotifications={handleClearNotifications}
+                  onDeleteTransaction={handleDeleteTransaction}
+                  onEditTransaction={handleEditTransaction}
                 />
               </div>
             ) : null}

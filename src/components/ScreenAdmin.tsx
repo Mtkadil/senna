@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, RefreshCw, AlertTriangle, ShieldCheck, Download, Users, Lock, BarChart3, Clock, ChevronRight, Save, ClipboardList, Plus, Trash2, Settings, Bell, Zap, SlidersHorizontal, CalendarClock, Table } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertTriangle, ShieldCheck, Download, Users, Lock, BarChart3, Clock, ChevronRight, Save, ClipboardList, Plus, Trash2, Settings, Bell, Zap, SlidersHorizontal, CalendarClock, Table, Pencil } from 'lucide-react';
 import AnimatedCounter from './AnimatedCounter';
 import { ServicePrice, AppConfig, AppNotification } from '../types';
 import { loginWithGoogle, getAccessToken, auth } from '../firebase';
@@ -20,9 +20,35 @@ interface ScreenAdminProps {
   onUpdateAppConfig: (newConfig: AppConfig) => Promise<void>;
   notifications: AppNotification[];
   onClearNotifications: () => Promise<void>;
+  onDeleteTransaction: (chairKey: string, transactionId: string) => Promise<void>;
+  onEditTransaction: (chairKey: string, transactionId: string, newAmount: number) => Promise<void>;
 }
 
 type TabType = 'overview' | 'staff' | 'prices' | 'developer' | 'security';
+
+interface EditTarget {
+  chairKey: string;
+  chairNum: number;
+  barberName: string;
+  transaction: {
+    id: string;
+    amount: number;
+    timestamp: string;
+    paymentMethod?: 'cash' | 'card';
+  };
+}
+
+interface DeleteTarget {
+  chairKey: string;
+  chairNum: number;
+  barberName: string;
+  transaction: {
+    id: string;
+    amount: number;
+    timestamp: string;
+    paymentMethod?: 'cash' | 'card';
+  };
+}
 
 export default function ScreenAdmin({
   totals,
@@ -38,7 +64,9 @@ export default function ScreenAdmin({
   appConfig,
   onUpdateAppConfig,
   notifications,
-  onClearNotifications
+  onClearNotifications,
+  onDeleteTransaction,
+  onEditTransaction
 }: ScreenAdminProps) {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showConfirm, setShowConfirm] = useState(false);
@@ -47,6 +75,58 @@ export default function ScreenAdmin({
   const [expandedChairs, setExpandedChairs] = useState<{ [key: string]: boolean }>({});
   const [showLinks, setShowLinks] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Admin Edit and Delete modal states
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const [editAmountInput, setEditAmountInput] = useState<string>('');
+  const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+  const [editError, setEditError] = useState<string>('');
+
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
+  const openEditModal = (chairKey: string, chairNum: number, barberName: string, transaction: any) => {
+    setEditTarget({ chairKey, chairNum, barberName, transaction });
+    setEditAmountInput(transaction.amount.toString());
+    setEditError('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editTarget) return;
+    const parsed = parseFloat(editAmountInput);
+    if (isNaN(parsed) || parsed <= 0) {
+      setEditError('Inserisci un importo valido maggiore di 0€.');
+      return;
+    }
+    setIsSavingEdit(true);
+    setEditError('');
+    try {
+      await onEditTransaction(editTarget.chairKey, editTarget.transaction.id, parsed);
+      setEditTarget(null);
+    } catch (err) {
+      console.error('Errore durante la modifica:', err);
+      setEditError('Errore durante il salvataggio. Riprova.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const openDeleteModal = (chairKey: string, chairNum: number, barberName: string, transaction: any) => {
+    setDeleteTarget({ chairKey, chairNum, barberName, transaction });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await onDeleteTransaction(deleteTarget.chairKey, deleteTarget.transaction.id);
+      setDeleteTarget(null);
+    } catch (err) {
+      console.error('Errore durante la cancellazione:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Local state for PIN inputs
   const [localPins, setLocalPins] = useState<{ [key: string]: string }>(pinsData);
@@ -637,7 +717,7 @@ export default function ScreenAdmin({
       className="w-full text-center max-w-5xl mx-auto px-1"
     >
       {/* Luxury Brand Header */}
-      <div className="flex flex-col md:flex-row items-center md:items-start justify-between mb-8 gap-4 border-b border-white/5 pb-6">
+      <div className="flex flex-col md:flex-row items-center md:items-center justify-between mb-8 gap-4 border-b border-white/5 pb-6">
         <div className="text-center md:text-left">
           <div className="flex items-center justify-center md:justify-start gap-2 mb-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-gold-primary animate-ping" />
@@ -652,12 +732,12 @@ export default function ScreenAdmin({
         </div>
         
         {/* Luxury Tab Navigation */}
-        <div className="flex flex-wrap gap-1 p-1 bg-[#0A0A0C] border border-white/5 rounded-2xl shadow-xl">
+        <div className="inline-flex flex-wrap items-center justify-center gap-1 p-1.5 bg-[#0D0D10]/95 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-4 py-2 rounded-xl text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+            className={`px-3.5 py-2 rounded-xl text-[10px] uppercase tracking-wider font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap border ${
               activeTab === 'overview' 
-                ? 'bg-gold-primary/10 text-gold-light border-gold-primary/30 shadow-[0_2px_12px_rgba(212,175,55,0.06)] font-extrabold' 
+                ? 'bg-gold-primary/15 text-gold-light border-gold-primary/40 shadow-[0_2px_12px_rgba(212,175,55,0.12)] font-extrabold' 
                 : 'text-stone-400 border-transparent hover:text-white hover:bg-white/5'
             }`}
           >
@@ -666,9 +746,9 @@ export default function ScreenAdmin({
           </button>
           <button
             onClick={() => setActiveTab('staff')}
-            className={`px-4 py-2 rounded-xl text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+            className={`px-3.5 py-2 rounded-xl text-[10px] uppercase tracking-wider font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap border ${
               activeTab === 'staff' 
-                ? 'bg-gold-primary/10 text-gold-light border-gold-primary/30 shadow-[0_2px_12px_rgba(212,175,55,0.06)] font-extrabold' 
+                ? 'bg-gold-primary/15 text-gold-light border-gold-primary/40 shadow-[0_2px_12px_rgba(212,175,55,0.12)] font-extrabold' 
                 : 'text-stone-400 border-transparent hover:text-white hover:bg-white/5'
             }`}
           >
@@ -677,9 +757,9 @@ export default function ScreenAdmin({
           </button>
           <button
             onClick={() => setActiveTab('prices')}
-            className={`px-4 py-2 rounded-xl text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+            className={`px-3.5 py-2 rounded-xl text-[10px] uppercase tracking-wider font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap border ${
               activeTab === 'prices' 
-                ? 'bg-gold-primary/10 text-gold-light border-gold-primary/30 shadow-[0_2px_12px_rgba(212,175,55,0.06)] font-extrabold' 
+                ? 'bg-gold-primary/15 text-gold-light border-gold-primary/40 shadow-[0_2px_12px_rgba(212,175,55,0.12)] font-extrabold' 
                 : 'text-stone-400 border-transparent hover:text-white hover:bg-white/5'
             }`}
           >
@@ -688,9 +768,9 @@ export default function ScreenAdmin({
           </button>
           <button
             onClick={() => setActiveTab('developer')}
-            className={`px-4 py-2 rounded-xl text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+            className={`px-3.5 py-2 rounded-xl text-[10px] uppercase tracking-wider font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap border ${
               activeTab === 'developer' 
-                ? 'bg-gold-primary/10 text-gold-light border-gold-primary/30 shadow-[0_2px_12px_rgba(212,175,55,0.06)] font-extrabold' 
+                ? 'bg-gold-primary/15 text-gold-light border-gold-primary/40 shadow-[0_2px_12px_rgba(212,175,55,0.12)] font-extrabold' 
                 : 'text-stone-400 border-transparent hover:text-white hover:bg-white/5'
             }`}
           >
@@ -699,9 +779,9 @@ export default function ScreenAdmin({
           </button>
           <button
             onClick={() => setActiveTab('security')}
-            className={`px-4 py-2 rounded-xl text-[10px] uppercase tracking-widest font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+            className={`px-3.5 py-2 rounded-xl text-[10px] uppercase tracking-wider font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap border ${
               activeTab === 'security' 
-                ? 'bg-gold-primary/10 text-gold-light border-gold-primary/30 shadow-[0_2px_12px_rgba(212,175,55,0.06)] font-extrabold' 
+                ? 'bg-gold-primary/15 text-gold-light border-gold-primary/40 shadow-[0_2px_12px_rgba(212,175,55,0.12)] font-extrabold' 
                 : 'text-stone-400 border-transparent hover:text-white hover:bg-white/5'
             }`}
           >
@@ -722,114 +802,18 @@ export default function ScreenAdmin({
             className="space-y-6 text-left"
           >
             {/* Landing-Page-Style Spotlight Hero Panel: Real-Time Total Income */}
-            <div className="bg-gradient-to-b from-[#121216] to-[#08080A] border border-gold-primary/20 p-6 md:p-8 rounded-3xl relative overflow-hidden shadow-[0_15px_50px_rgba(0,0,0,0.8),0_0_40px_rgba(212,175,55,0.04)]">
+            <div className="bg-gradient-to-b from-[#121216] to-[#08080A] border border-gold-primary/20 p-6 md:p-8 rounded-3xl relative overflow-hidden shadow-[0_15px_50px_rgba(0,0,0,0.8),0_0_40px_rgba(212,175,55,0.04)] flex items-center justify-center text-center">
               
               {/* Luxury ambient light behind */}
               <div className="absolute right-0 top-0 w-80 h-80 bg-gold-primary/5 rounded-full blur-[100px] pointer-events-none" />
               <div className="absolute left-0 bottom-0 w-60 h-60 bg-gold-dark/5 rounded-full blur-[80px] pointer-events-none" />
               
-              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                
-                {/* Total Counter Core */}
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span className="text-[10px] uppercase tracking-[0.3em] text-stone-400 font-extrabold">
-                      Incasso Totale in Tempo Reale
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-baseline">
-                    <span className="text-3xl sm:text-4xl font-serif text-gold-primary font-medium mr-1 select-none">€</span>
-                    <span className="text-6xl sm:text-7xl lg:text-8xl font-serif font-extrabold tracking-tighter gold-text-gradient drop-shadow-[0_2px_15px_rgba(212,175,55,0.15)] leading-none">
-                      <AnimatedCounter value={grandTotal} />
-                    </span>
-                  </div>
-                  
-                  <p className="text-stone-500 text-[11px] font-sans tracking-wide">
-                    Monitoraggio attivo per la giornata odierna. Tutti i dati sono sincronizzati in tempo reale.
-                  </p>
-                </div>
-
-                {/* Performance & Action Panel */}
-                <div className="md:w-64 bg-black/40 border border-white/5 rounded-2xl p-4.5 flex flex-col justify-between gap-4">
-                  <div className="space-y-3">
-                    <span className="text-[9px] uppercase tracking-widest text-[#8E8E93] font-bold block">
-                      Strumenti di Controllo
-                    </span>
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={handleExportCSV}
-                        className="bg-stone-900 hover:bg-gold-primary/15 hover:text-gold-light border border-white/5 hover:border-gold-primary/30 text-stone-300 py-2.5 px-3 rounded-xl transition-all cursor-pointer font-bold text-[9px] uppercase tracking-wider flex items-center justify-center gap-1.5 focus:outline-none shadow-md"
-                        title="Esporta CSV"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        CSV
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirm(true)}
-                        className="bg-stone-900 hover:bg-red-500/15 hover:text-red-400 border border-white/5 hover:border-red-500/30 text-stone-300 py-2.5 px-3 rounded-xl transition-all cursor-pointer font-bold text-[9px] uppercase tracking-wider flex items-center justify-center gap-1.5 focus:outline-none shadow-md"
-                        title="Reset"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        Reset
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="pt-3.5 border-t border-white/5 space-y-1">
-                    <span className="text-[8px] uppercase tracking-widest text-stone-500 block leading-none">Ultima Operazione</span>
-                    <p className="text-[10px] text-stone-300 font-mono font-semibold truncate">
-                      {globalHistory.length > 0 
-                        ? `${globalHistory[0].barberName}: +${globalHistory[0].amount}€`
-                        : "In attesa di transazioni"
-                      }
-                    </p>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* High-End Split Revenue Analytics Bar */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6 pt-6 border-t border-white/5 relative z-10">
-                <div className="bg-black/35 border border-white/5 rounded-2xl p-4 flex items-center justify-between group hover:border-emerald-500/20 transition-all duration-300">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/5 border border-emerald-500/10 flex items-center justify-center text-emerald-400 font-serif font-bold text-lg">
-                      C
-                    </div>
-                    <div>
-                      <span className="text-[8.5px] uppercase tracking-wider text-stone-500 block leading-none mb-1">Pagamenti in Contanti</span>
-                      <span className="text-xl font-semibold font-mono text-stone-100">€{grandCashTotal}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full font-mono">
-                      {percent(grandCashTotal)}%
-                    </span>
-                  </div>
-                </div>
-
-                <div className="bg-black/35 border border-white/5 rounded-2xl p-4 flex items-center justify-between group hover:border-blue-500/20 transition-all duration-300">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-500/5 border border-blue-500/10 flex items-center justify-center text-blue-400 font-serif font-bold text-lg">
-                      P
-                    </div>
-                    <div>
-                      <span className="text-[8.5px] uppercase tracking-wider text-stone-500 block leading-none mb-1">Pagamenti POS / Carte</span>
-                      <span className="text-xl font-semibold font-mono text-stone-100">€{grandCardTotal}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-full font-mono">
-                      {percent(grandCardTotal)}%
-                    </span>
-                  </div>
+              <div className="relative z-10 flex items-center justify-center py-2">
+                <div className="flex items-baseline justify-center">
+                  <span className="text-3xl sm:text-4xl lg:text-5xl font-serif text-gold-primary font-medium mr-1.5 select-none">€</span>
+                  <span className="text-6xl sm:text-7xl lg:text-8xl font-serif font-extrabold tracking-tighter gold-text-gradient drop-shadow-[0_2px_15px_rgba(212,175,55,0.15)] leading-none">
+                    <AnimatedCounter value={grandTotal} />
+                  </span>
                 </div>
               </div>
 
@@ -936,14 +920,34 @@ export default function ScreenAdmin({
                                 <p className="text-[9px] text-stone-500 italic py-1.5 pl-0.5">Nessuna operazione registrata oggi.</p>
                               ) : (
                                 histories[key].map(item => (
-                                  <div key={item.id} className="flex justify-between items-center bg-black/40 rounded-xl px-3 py-2 border border-white/5 text-[9.5px] font-mono">
+                                  <div key={item.id} className="flex justify-between items-center bg-black/40 rounded-xl px-3 py-2 border border-white/5 text-[9.5px] font-mono hover:border-gold-primary/20 transition-all">
                                     <div className="flex items-center gap-2">
                                       <span className="text-stone-400">{new Date(item.timestamp).toLocaleTimeString('it-IT')}</span>
                                       <span className="text-[7px] px-1.5 py-0.5 bg-white/5 border border-white/5 rounded text-stone-400 uppercase tracking-widest">
                                         {item.paymentMethod === 'card' ? 'Carta' : 'Cont.'}
                                       </span>
                                     </div>
-                                    <span className="font-bold text-gold-light">+{item.amount}€</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-gold-light">+{item.amount}€</span>
+                                      <div className="flex items-center gap-1 border-l border-white/10 pl-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => openEditModal(key, parseInt(num, 10), barberName, item)}
+                                          title="Modifica importo"
+                                          className="p-1 rounded text-stone-400 hover:text-gold-primary hover:bg-gold-primary/10 transition-colors cursor-pointer"
+                                        >
+                                          <Pencil className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => openDeleteModal(key, parseInt(num, 10), barberName, item)}
+                                          title="Elimina transazione"
+                                          className="p-1 rounded text-stone-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
                                   </div>
                                 ))
                               )}
@@ -993,11 +997,29 @@ export default function ScreenAdmin({
                           <p className="text-[8.5px] text-stone-500 leading-none">{new Date(item.timestamp).toLocaleTimeString('it-IT')}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5">
                         <span className="text-[7.5px] px-2 py-0.5 bg-white/5 border border-white/5 rounded-md text-stone-400 uppercase tracking-widest font-bold">
                           {item.paymentMethod === 'card' ? 'Carta' : 'Contanti'}
                         </span>
                         <span className="font-bold text-gold-primary text-[12px] font-serif">+{item.amount}€</span>
+                        <div className="flex items-center gap-1 border-l border-white/10 pl-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(`chair${item.chairNum}`, item.chairNum, item.barberName, item)}
+                            title="Modifica importo"
+                            className="p-1.5 rounded-lg text-stone-400 hover:text-gold-primary hover:bg-gold-primary/10 transition-colors cursor-pointer"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openDeleteModal(`chair${item.chairNum}`, item.chairNum, item.barberName, item)}
+                            title="Elimina transazione"
+                            className="p-1.5 rounded-lg text-stone-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -1549,6 +1571,157 @@ export default function ScreenAdmin({
                   className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-extrabold py-3 rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-amber-900/20 cursor-pointer transition-colors"
                 >
                   {isResetting ? 'Azzzeramento...' : 'Sì, Reset'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {editTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-sm bg-[#0E0E12] border border-gold-primary/30 p-6 rounded-3xl shadow-[0_15px_45px_rgba(0,0,0,0.8),0_0_30px_rgba(212,175,55,0.1)] text-left"
+            >
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-gold-primary/10 border border-gold-primary/30 flex items-center justify-center text-gold-primary">
+                  <Pencil className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-white uppercase tracking-wider">
+                    Modifica Importo
+                  </h3>
+                  <p className="text-[9px] uppercase tracking-widest text-gold-primary font-mono font-bold">
+                    Postazione 0{editTarget.chairNum} &bull; {editTarget.barberName}
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-black/50 border border-white/5 rounded-2xl p-4 mb-4">
+                <div className="flex justify-between items-center text-xs text-stone-400 mb-2">
+                  <span>Importo attuale:</span>
+                  <span className="font-mono font-bold text-stone-300 line-through">+{editTarget.transaction.amount}€</span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-stone-400 mb-2">
+                  <span>Registrato alle:</span>
+                  <span className="font-mono text-stone-300">
+                    {new Date(editTarget.transaction.timestamp).toLocaleTimeString('it-IT')}
+                  </span>
+                </div>
+                {parseFloat(editAmountInput) > 0 && (
+                  <div className="flex justify-between items-center text-xs pt-2 border-t border-white/5">
+                    <span className="text-stone-400">Variazione totale:</span>
+                    <span className={`font-mono font-bold ${
+                      parseFloat(editAmountInput) - editTarget.transaction.amount >= 0 ? 'text-emerald-400' : 'text-red-400'
+                    }`}>
+                      {parseFloat(editAmountInput) - editTarget.transaction.amount >= 0 ? '+' : ''}
+                      {(parseFloat(editAmountInput) - editTarget.transaction.amount).toFixed(2)}€
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="mb-4">
+                <label className="text-[9px] uppercase tracking-widest text-stone-400 font-extrabold block mb-1.5 ml-1">
+                  Nuovo Importo Corretto (€)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gold-primary font-mono text-lg font-bold">€</span>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    value={editAmountInput}
+                    onChange={(e) => setEditAmountInput(e.target.value)}
+                    autoFocus
+                    placeholder="0.00"
+                    className="w-full bg-black/60 border border-gold-primary/40 focus:border-gold-primary focus:ring-2 focus:ring-gold-primary/20 rounded-2xl pl-10 pr-4 py-3 text-lg font-mono font-bold text-white outline-none transition-all"
+                  />
+                </div>
+                {editError && (
+                  <p className="text-[10px] text-red-400 font-bold mt-2 ml-1">⚠️ {editError}</p>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setEditTarget(null)}
+                  disabled={isSavingEdit}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-stone-300 font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer border border-white/5 disabled:opacity-50"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  disabled={isSavingEdit}
+                  className="flex-1 bg-gradient-to-r from-gold-primary to-gold-light text-black font-extrabold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wider transition-all shadow-[0_4px_15px_rgba(212,175,55,0.2)] hover:brightness-110 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingEdit ? (
+                    <div className="w-4 h-4 rounded-full border-2 border-black/30 border-t-black animate-spin" />
+                  ) : (
+                    'Salva Modifica'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {deleteTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-sm bg-[#0E0E12] border border-red-500/30 p-6 rounded-3xl shadow-[0_15px_45px_rgba(0,0,0,0.8),0_0_30px_rgba(239,68,68,0.1)] text-left"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-red-950/50 border border-red-500/40 flex items-center justify-center text-red-400">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-white uppercase tracking-wider">
+                    Elimina Transazione
+                  </h3>
+                  <p className="text-[9px] uppercase tracking-widest text-red-400 font-mono font-bold">
+                    Operazione Amministratore
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-black/50 border border-white/5 rounded-2xl p-4 mb-5 text-xs text-stone-300 space-y-2">
+                <p>
+                  Sei sicuro di voler eliminare la transazione di <strong className="text-red-400 font-mono font-bold text-sm">+{deleteTarget.transaction.amount}€</strong> di <strong>{deleteTarget.barberName}</strong> (Postazione 0{deleteTarget.chairNum}) registrata alle {new Date(deleteTarget.transaction.timestamp).toLocaleTimeString('it-IT')}?
+                </p>
+                <p className="text-[10px] text-stone-400 italic pt-1 border-t border-white/5">
+                  L'importo verrà sottratto dal totale della poltrona e dall'incasso generale di oggi.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={isDeleting}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-stone-300 font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer border border-white/5 disabled:opacity-50"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting}
+                  className="flex-1 bg-red-600 hover:bg-red-500 text-white font-extrabold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wider transition-all shadow-[0_4px_15px_rgba(220,38,38,0.25)] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  ) : (
+                    'Sì, Elimina'
+                  )}
                 </button>
               </div>
             </motion.div>
