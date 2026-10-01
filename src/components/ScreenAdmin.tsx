@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, RefreshCw, AlertTriangle, ShieldCheck, Download, Users, Lock, BarChart3, Clock, ChevronRight, Save, ClipboardList, Plus, Trash2, Settings, Bell, Zap, SlidersHorizontal, CalendarClock, Table, Pencil } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertTriangle, ShieldCheck, Download, Users, Lock, BarChart3, Clock, ChevronRight, Save, ClipboardList, Plus, Trash2, Settings, Bell, Zap, SlidersHorizontal, CalendarClock, Table, Pencil, History, FileText, CheckCircle2, Filter, AlertCircle, RotateCcw } from 'lucide-react';
 import AnimatedCounter from './AnimatedCounter';
-import { ServicePrice, AppConfig, AppNotification } from '../types';
+import { ServicePrice, AppConfig, AppNotification, AuditLogEntry } from '../types';
 import { loginWithGoogle, getAccessToken, auth } from '../firebase';
 
 interface ScreenAdminProps {
@@ -22,9 +22,11 @@ interface ScreenAdminProps {
   onClearNotifications: () => Promise<void>;
   onDeleteTransaction: (chairKey: string, transactionId: string) => Promise<void>;
   onEditTransaction: (chairKey: string, transactionId: string, newAmount: number) => Promise<void>;
+  auditLogs?: AuditLogEntry[];
+  onClearAuditLogs?: () => Promise<void>;
 }
 
-type TabType = 'overview' | 'staff' | 'prices' | 'developer' | 'security';
+type TabType = 'overview' | 'audit' | 'staff' | 'prices' | 'developer' | 'security';
 
 interface EditTarget {
   chairKey: string;
@@ -66,7 +68,9 @@ export default function ScreenAdmin({
   notifications,
   onClearNotifications,
   onDeleteTransaction,
-  onEditTransaction
+  onEditTransaction,
+  auditLogs = [],
+  onClearAuditLogs
 }: ScreenAdminProps) {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showConfirm, setShowConfirm] = useState(false);
@@ -84,6 +88,13 @@ export default function ScreenAdmin({
 
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
+  // Audit Log Filter states
+  const [auditActionFilter, setAuditActionFilter] = useState<'all' | 'insert' | 'edit' | 'delete'>('all');
+  const [auditBarberFilter, setAuditBarberFilter] = useState<string>('all');
+  const [auditSearchQuery, setAuditSearchQuery] = useState<string>('');
+  const [isClearingLogs, setIsClearingLogs] = useState(false);
+  const [showClearLogsConfirm, setShowClearLogsConfirm] = useState(false);
 
   const openEditModal = (chairKey: string, chairNum: number, barberName: string, transaction: any) => {
     setEditTarget({ chairKey, chairNum, barberName, transaction });
@@ -125,6 +136,76 @@ export default function ScreenAdmin({
       console.error('Errore durante la cancellazione:', err);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // Filtered audit logs
+  const filteredAuditLogs = useMemo(() => {
+    return auditLogs.filter((log) => {
+      if (auditActionFilter !== 'all' && log.action !== auditActionFilter) {
+        return false;
+      }
+      if (auditBarberFilter !== 'all' && log.barberName !== auditBarberFilter) {
+        return false;
+      }
+      if (auditSearchQuery.trim()) {
+        const query = auditSearchQuery.toLowerCase();
+        const matchDetails = (log.details || '').toLowerCase().includes(query);
+        const matchBarber = (log.barberName || '').toLowerCase().includes(query);
+        const matchAmount = log.amount ? log.amount.toString().includes(query) : false;
+        if (!matchDetails && !matchBarber && !matchAmount) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [auditLogs, auditActionFilter, auditBarberFilter, auditSearchQuery]);
+
+  const auditStats = useMemo(() => {
+    const total = auditLogs.length;
+    const inserts = auditLogs.filter((l) => l.action === 'insert').length;
+    const edits = auditLogs.filter((l) => l.action === 'edit').length;
+    const deletes = auditLogs.filter((l) => l.action === 'delete').length;
+    return { total, inserts, edits, deletes };
+  }, [auditLogs]);
+
+  const handleExportAuditCSV = () => {
+    const todayStr = new Date().toLocaleDateString('it-IT');
+    const todayTimeStr = new Date().toLocaleTimeString('it-IT');
+    let csv = 'sep=;\n';
+    csv += 'SENNA BARBERSHOP - Registro Log Modifiche & Operazioni\n';
+    csv += `Data Esportazione:;${todayStr} ${todayTimeStr}\n\n`;
+    csv += 'Data & Ora;Azione;Barbiere;Postazione;Esecutore;Importo (€);Dettagli\n';
+
+    auditLogs.forEach((entry) => {
+      const time = new Date(entry.timestamp).toLocaleString('it-IT');
+      const actionName = entry.action === 'delete' ? 'ELIMINAZIONE' : entry.action === 'edit' ? 'MODIFICA' : entry.action === 'insert' ? 'INSERIMENTO' : 'RESET';
+      const barber = entry.barberName || '-';
+      const postazione = entry.chairNum ? `Poltrona 0${entry.chairNum}` : '-';
+      const executor = entry.performedBy === 'operatore' ? 'Operatore' : 'Admin';
+      const amount = typeof entry.amount === 'number' ? entry.amount.toString() : typeof entry.newAmount === 'number' ? entry.newAmount.toString() : '-';
+      const cleanDetails = (entry.details || '').replace(/;/g, ',');
+      csv += `"${time}";${actionName};"${barber}";"${postazione}";${executor};${amount};"${cleanDetails}"\n`;
+    });
+
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Senna_AuditLog_${todayStr.replace(/\//g, '-')}.csv`);
+    link.click();
+  };
+
+  const handleClearLogsConfirm = async () => {
+    if (!onClearAuditLogs) return;
+    setIsClearingLogs(true);
+    try {
+      await onClearAuditLogs();
+      setShowClearLogsConfirm(false);
+    } catch (err) {
+      console.error('Error clearing audit logs:', err);
+    } finally {
+      setIsClearingLogs(false);
     }
   };
 
@@ -745,6 +826,26 @@ export default function ScreenAdmin({
             Overview
           </button>
           <button
+            onClick={() => setActiveTab('audit')}
+            className={`px-3.5 py-2 rounded-xl text-[10px] uppercase tracking-wider font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap border ${
+              activeTab === 'audit' 
+                ? 'bg-gold-primary/15 text-gold-light border-gold-primary/40 shadow-[0_2px_12px_rgba(212,175,55,0.12)] font-extrabold' 
+                : 'text-stone-400 border-transparent hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <History className="w-3.5 h-3.5" />
+            Log & Audit
+            {auditStats.deletes > 0 ? (
+              <span className="px-1.5 py-0.2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-full text-[8px] font-mono font-bold">
+                {auditStats.deletes}
+              </span>
+            ) : auditStats.total > 0 ? (
+              <span className="px-1.5 py-0.2 bg-white/5 border border-white/10 text-stone-400 rounded-full text-[8px] font-mono">
+                {auditStats.total}
+              </span>
+            ) : null}
+          </button>
+          <button
             onClick={() => setActiveTab('staff')}
             className={`px-3.5 py-2 rounded-xl text-[10px] uppercase tracking-wider font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap border ${
               activeTab === 'staff' 
@@ -801,6 +902,34 @@ export default function ScreenAdmin({
             transition={{ duration: 0.3 }}
             className="space-y-6 text-left"
           >
+            {/* Real-time Notification Alert for Deleted / Modified Amounts */}
+            {notifications.filter(n => n.type === 'error' || n.type === 'warning').length > 0 && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-[0_4px_20px_rgba(239,68,68,0.1)]">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 flex items-center justify-center shrink-0">
+                    <AlertCircle className="w-4 h-4 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] uppercase tracking-widest text-red-400 font-bold font-mono">Notifica Amministratore</span>
+                      <span className="text-[8px] text-stone-500">&bull; {new Date(notifications.filter(n => n.type === 'error' || n.type === 'warning')[0].timestamp).toLocaleTimeString('it-IT')}</span>
+                    </div>
+                    <p className="text-xs font-semibold text-stone-200 mt-0.5">
+                      {notifications.filter(n => n.type === 'error' || n.type === 'warning')[0].message}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('audit')}
+                  className="bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 px-3.5 py-1.5 rounded-xl text-[9.5px] uppercase tracking-wider font-extrabold cursor-pointer transition-all shrink-0 flex items-center gap-1.5 active:scale-95"
+                >
+                  <History className="w-3.5 h-3.5" />
+                  Registro Modifiche
+                </button>
+              </div>
+            )}
+
             {/* Landing-Page-Style Spotlight Hero Panel: Real-Time Total Income */}
             <div className="bg-gradient-to-b from-[#121216] to-[#08080A] border border-gold-primary/20 p-6 md:p-8 rounded-3xl relative overflow-hidden shadow-[0_15px_50px_rgba(0,0,0,0.8),0_0_40px_rgba(212,175,55,0.04)] flex items-center justify-center text-center">
               
@@ -1023,6 +1152,258 @@ export default function ScreenAdmin({
                       </div>
                     </div>
                   ))
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'audit' && (
+          <motion.div
+            key="audit"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-6 text-left"
+          >
+            {/* Header & Description */}
+            <div className="bg-[#0A0A0C] border border-white/5 rounded-2xl p-6 shadow-2xl">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-5 mb-5">
+                <div>
+                  <h3 className="text-[10px] uppercase tracking-[0.25em] text-gold-primary font-extrabold flex items-center gap-2 mb-1">
+                    <History className="w-4 h-4 text-gold-primary" /> REGISTRO GIORNALIERO OPERAZIONI & MODIFICHE
+                  </h3>
+                  <p className="text-[10px] text-stone-500 leading-relaxed">
+                    Tracciamento in tempo reale di tutte le attività: nuovi incassi inseriti dagli operatori, modifiche e cancellazioni effettuate.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleExportAuditCSV}
+                    disabled={auditLogs.length === 0}
+                    className="bg-gold-primary/10 hover:bg-gold-primary/20 border border-gold-primary/30 text-gold-light px-3.5 py-2 rounded-xl text-[9px] uppercase tracking-wider font-extrabold transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-40"
+                    title="Scarica log completo in CSV"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Esporta CSV
+                  </button>
+                  {onClearAuditLogs && (
+                    <button
+                      type="button"
+                      onClick={() => setShowClearLogsConfirm(true)}
+                      disabled={auditLogs.length === 0}
+                      className="bg-white/5 hover:bg-white/10 border border-white/10 text-stone-400 hover:text-red-400 px-3 py-2 rounded-xl text-[9px] uppercase tracking-wider font-bold transition-all cursor-pointer disabled:opacity-40"
+                      title="Pulisci log"
+                    >
+                      Pulisci
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 4 Summary Stats Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 flex flex-col justify-center">
+                  <span className="text-[8px] uppercase tracking-widest text-stone-500 font-bold block mb-1">Totale Eventi</span>
+                  <span className="text-xl font-bold font-mono text-white">{auditStats.total}</span>
+                </div>
+                <div className="bg-black/40 border border-emerald-500/20 rounded-xl p-3.5 flex flex-col justify-center">
+                  <span className="text-[8px] uppercase tracking-widest text-emerald-400 font-bold block mb-1">Inseriti da Operatori</span>
+                  <span className="text-xl font-bold font-mono text-emerald-400">{auditStats.inserts}</span>
+                </div>
+                <div className="bg-black/40 border border-amber-500/20 rounded-xl p-3.5 flex flex-col justify-center">
+                  <span className="text-[8px] uppercase tracking-widest text-amber-400 font-bold block mb-1">Modifiche Effettuate</span>
+                  <span className="text-xl font-bold font-mono text-amber-400">{auditStats.edits}</span>
+                </div>
+                <div className="bg-black/40 border border-red-500/20 rounded-xl p-3.5 flex flex-col justify-center">
+                  <span className="text-[8px] uppercase tracking-widest text-red-400 font-bold block mb-1">Incassi Eliminati</span>
+                  <span className="text-xl font-bold font-mono text-red-400">{auditStats.deletes}</span>
+                </div>
+              </div>
+
+              {/* Interactive Filter Controls */}
+              <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-black/30 border border-white/5 rounded-xl p-3 mb-4">
+                {/* Action Filter Pills */}
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  <span className="text-[8px] uppercase tracking-wider text-stone-500 font-bold mr-1 hidden sm:inline">Tipo:</span>
+                  <button
+                    type="button"
+                    onClick={() => setAuditActionFilter('all')}
+                    className={`px-2.5 py-1 rounded-lg text-[8.5px] uppercase tracking-wider font-extrabold cursor-pointer transition-all ${
+                      auditActionFilter === 'all'
+                        ? 'bg-white/15 text-white border border-white/20'
+                        : 'text-stone-500 hover:text-stone-300'
+                    }`}
+                  >
+                    Tutti ({auditStats.total})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuditActionFilter('delete')}
+                    className={`px-2.5 py-1 rounded-lg text-[8.5px] uppercase tracking-wider font-extrabold cursor-pointer transition-all ${
+                      auditActionFilter === 'delete'
+                        ? 'bg-red-500/20 text-red-400 border border-red-500/40 shadow-sm'
+                        : 'text-stone-500 hover:text-red-400'
+                    }`}
+                  >
+                    🔴 Eliminati ({auditStats.deletes})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuditActionFilter('edit')}
+                    className={`px-2.5 py-1 rounded-lg text-[8.5px] uppercase tracking-wider font-extrabold cursor-pointer transition-all ${
+                      auditActionFilter === 'edit'
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow-sm'
+                        : 'text-stone-500 hover:text-amber-400'
+                    }`}
+                  >
+                    🟡 Modificati ({auditStats.edits})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuditActionFilter('insert')}
+                    className={`px-2.5 py-1 rounded-lg text-[8.5px] uppercase tracking-wider font-extrabold cursor-pointer transition-all ${
+                      auditActionFilter === 'insert'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm'
+                        : 'text-stone-500 hover:text-emerald-400'
+                    }`}
+                  >
+                    🟢 Inseriti ({auditStats.inserts})
+                  </button>
+                </div>
+
+                {/* Operator Selector & Search */}
+                <div className="flex gap-2 items-center">
+                  <select
+                    value={auditBarberFilter}
+                    onChange={(e) => setAuditBarberFilter(e.target.value)}
+                    className="bg-black/60 border border-white/10 rounded-lg px-2.5 py-1 text-[9px] text-stone-300 font-sans outline-none focus:border-gold-primary cursor-pointer"
+                  >
+                    <option value="all">Tutti gli Operatori</option>
+                    {Object.keys(barberNames).filter(k => k.startsWith('chair')).map(key => (
+                      <option key={key} value={barberNames[key]}>
+                        {barberNames[key]}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Cerca log..."
+                    value={auditSearchQuery}
+                    onChange={(e) => setAuditSearchQuery(e.target.value)}
+                    className="bg-black/60 border border-white/10 rounded-lg px-2.5 py-1 text-[9px] text-white font-sans outline-none focus:border-gold-primary w-28 sm:w-36"
+                  />
+                </div>
+              </div>
+
+              {/* Log Timeline List */}
+              <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                {filteredAuditLogs.length === 0 ? (
+                  <div className="text-center py-12 text-stone-500 text-xs italic bg-black/20 border border-white/5 rounded-xl">
+                    Nessuna operazione registrata corrisponde ai filtri selezionati.
+                  </div>
+                ) : (
+                  filteredAuditLogs.map((item) => {
+                    const time = new Date(item.timestamp).toLocaleTimeString('it-IT');
+                    const dateStr = new Date(item.timestamp).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+                    
+                    const isDelete = item.action === 'delete';
+                    const isEdit = item.action === 'edit';
+                    const isInsert = item.action === 'insert';
+
+                    const borderClass = isDelete 
+                      ? 'border-red-500/30 bg-red-950/10 hover:border-red-500/50' 
+                      : isEdit 
+                        ? 'border-amber-500/30 bg-amber-950/10 hover:border-amber-500/50' 
+                        : 'border-white/5 bg-black/40 hover:border-gold-primary/20';
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`border rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${borderClass}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                            isDelete 
+                              ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                              : isEdit 
+                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
+                                : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          }`}>
+                            {isDelete && <Trash2 className="w-4 h-4" />}
+                            {isEdit && <Pencil className="w-4 h-4" />}
+                            {isInsert && <Plus className="w-4 h-4" />}
+                            {!isDelete && !isEdit && !isInsert && <RotateCcw className="w-4 h-4" />}
+                          </div>
+
+                          <div>
+                            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                              <span className={`text-[7.5px] uppercase tracking-widest font-extrabold px-1.5 py-0.5 rounded ${
+                                isDelete 
+                                  ? 'bg-red-500/20 text-red-400' 
+                                  : isEdit 
+                                    ? 'bg-amber-500/20 text-amber-300' 
+                                    : 'bg-emerald-500/20 text-emerald-300'
+                              }`}>
+                                {isDelete ? 'Incasso Eliminato' : isEdit ? 'Importo Modificato' : 'Nuovo Inserimento'}
+                              </span>
+
+                              <span className={`text-[7.5px] uppercase tracking-widest font-mono font-bold px-1.5 py-0.5 rounded ${
+                                item.performedBy === 'operatore' 
+                                  ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
+                                  : 'bg-gold-primary/10 text-gold-light border border-gold-primary/20'
+                              }`}>
+                                {item.performedBy === 'operatore' ? 'Operatore' : 'Admin'}
+                              </span>
+
+                              {item.chairNum && (
+                                <span className="text-[7.5px] font-mono text-stone-400 bg-white/5 px-1.5 py-0.5 rounded">
+                                  Postazione 0{item.chairNum}
+                                </span>
+                              )}
+
+                              {item.barberName && (
+                                <span className="text-[8.5px] font-bold text-stone-200">
+                                  {item.barberName}
+                                </span>
+                              )}
+                            </div>
+
+                            <p className="text-[10px] text-stone-300 leading-snug">
+                              {item.details}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 border-white/5 pt-2 sm:pt-0 shrink-0">
+                          <div className="text-right">
+                            {isDelete && typeof item.amount === 'number' && (
+                              <span className="font-mono font-bold text-xs text-red-400">
+                                -{item.amount}€
+                              </span>
+                            )}
+                            {isEdit && typeof item.oldAmount === 'number' && typeof item.newAmount === 'number' && (
+                              <div className="flex items-center gap-1 font-mono text-xs">
+                                <span className="text-stone-500 line-through">+{item.oldAmount}€</span>
+                                <span className="text-stone-400">&rarr;</span>
+                                <span className="font-bold text-amber-400">+{item.newAmount}€</span>
+                              </div>
+                            )}
+                            {isInsert && typeof item.amount === 'number' && (
+                              <span className="font-mono font-bold text-xs text-emerald-400">
+                                +{item.amount}€
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[8.5px] font-mono text-stone-500 mt-0.5">
+                            {dateStr} &bull; {time}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -1721,6 +2102,58 @@ export default function ScreenAdmin({
                     <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
                   ) : (
                     'Sì, Elimina'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showClearLogsConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-sm bg-[#0E0E12] border border-red-500/30 p-6 rounded-3xl shadow-[0_15px_45px_rgba(0,0,0,0.8),0_0_30px_rgba(239,68,68,0.1)] text-left"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-2xl bg-red-950/50 border border-red-500/40 flex items-center justify-center text-red-400">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-white uppercase tracking-wider">
+                    Pulisci Log Modifiche
+                  </h3>
+                  <p className="text-[9px] uppercase tracking-widest text-red-400 font-mono font-bold">
+                    Operazione Amministratore
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs text-stone-300 leading-relaxed mb-6">
+                Vuoi davvero cancellare la cronologia delle modifiche e delle operazioni registrate? Questa azione non può essere annullata.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowClearLogsConfirm(false)}
+                  disabled={isClearingLogs}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-stone-300 font-bold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer border border-white/5 disabled:opacity-50"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearLogsConfirm}
+                  disabled={isClearingLogs}
+                  className="flex-1 bg-red-600 hover:bg-red-500 text-white font-extrabold py-2.5 px-4 rounded-xl text-xs uppercase tracking-wider transition-all shadow-[0_4px_15px_rgba(220,38,38,0.25)] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isClearingLogs ? (
+                    <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  ) : (
+                    'Sì, Pulisci'
                   )}
                 </button>
               </div>

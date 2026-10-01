@@ -110,6 +110,34 @@
         "type": { "type": "string", "enum": ["info", "success", "warning", "error"] }
       },
       "required": ["id", "title", "message", "timestamp", "read", "type"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Daily audit log of all operations (inserts, edits, deletes) performed by operators or admin.",
+      "type": "object",
+      "properties": {
+        "list": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "action": { "type": "string", "enum": ["insert", "edit", "delete", "reset"] },
+              "chairKey": { "type": "string" },
+              "chairNum": { "type": "number" },
+              "barberName": { "type": "string" },
+              "amount": { "type": "number" },
+              "oldAmount": { "type": "number" },
+              "newAmount": { "type": "number" },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "details": { "type": "string" },
+              "performedBy": { "type": "string", "enum": ["operatore", "admin"] }
+            },
+            "required": ["id", "action", "timestamp", "details", "performedBy"]
+          }
+        }
+      },
+      "required": ["list"]
     }
   },
   "firestore": {
@@ -122,7 +150,7 @@
       "description": "The collection of barber chairs tracking live revenue."
     },
     "settings/{docId}": {
-      "description": "Global custom configurations such as password PINs, barber names, prices, and app config."
+      "description": "Global custom configurations such as password PINs, barber names, prices, app config, notifications, and daily audit log."
     },
     "reports/{docId}": {
       "description": "Historical reports exported daily."

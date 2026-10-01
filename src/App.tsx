@@ -4,7 +4,7 @@ import { doc, onSnapshot, updateDoc, setDoc, getDoc, serverTimestamp } from 'fir
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { LogOut } from 'lucide-react';
 import { db, auth, handleFirestoreError } from './firebase';
-import { OperationType, ScreenType, ServicePrice, AppConfig, AppNotification } from './types';
+import { OperationType, ScreenType, ServicePrice, AppConfig, AppNotification, AuditLogEntry } from './types';
 
 // Screens
 import ScreenHome from './components/ScreenHome';
@@ -41,6 +41,7 @@ export default function App() {
     }
   });
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -206,6 +207,56 @@ export default function App() {
     });
     return () => unsub();
   }, []);
+
+  // Subscribe to Daily Audit Log
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'auditLog'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (Array.isArray(data?.list)) {
+          setAuditLogs(data.list);
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const appendAuditLog = async (entry: Omit<AuditLogEntry, 'id'>) => {
+    const newEntry: AuditLogEntry = {
+      id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      ...entry,
+    };
+    setAuditLogs((prev) => {
+      const updated = [newEntry, ...prev].slice(0, 300);
+      setDoc(doc(db, 'settings', 'auditLog'), { list: updated }).catch((err) => {
+        console.error('Error saving audit log:', err);
+      });
+      return updated;
+    });
+  };
+
+  const appendNotification = async (notif: Omit<AppNotification, 'id'>) => {
+    const newNotif: AppNotification = {
+      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      ...notif,
+    };
+    setNotifications((prev) => {
+      const updated = [newNotif, ...prev].slice(0, 50);
+      setDoc(doc(db, 'settings', 'notifications'), { list: updated }).catch((err) => {
+        console.error('Error saving notification:', err);
+      });
+      return updated;
+    });
+  };
+
+  const handleClearAuditLogs = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'auditLog'), { list: [] });
+      setAuditLogs([]);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'settings/auditLog');
+    }
+  };
 
   const handleUpdatePins = async (newPins: { [key: string]: string }) => {
     try {
@@ -404,6 +455,8 @@ export default function App() {
   const handleAddAmount = async (amount: number) => {
     if (!selectedChair) return;
     const chairKey = `chair${selectedChair}`;
+    const chairNum = selectedChair;
+    const barberName = barberNames[chairKey] || `Poltrona 0${chairNum}`;
     const currentObj = chairsData[chairKey] || { total: 0, history: [] };
     const newTotal = currentObj.total + amount;
 
@@ -422,6 +475,18 @@ export default function App() {
         updatedAt: serverTimestamp(),
         history: newHistory,
       });
+
+      // Registra operazione nel log giornaliero
+      await appendAuditLog({
+        action: 'insert',
+        chairKey,
+        chairNum,
+        barberName,
+        amount,
+        timestamp: newHistoryItem.timestamp,
+        details: `L'operatore ${barberName} ha registrato un nuovo incasso di +${amount}€`,
+        performedBy: 'operatore',
+      });
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `chairs/${chairKey}`);
     }
@@ -433,8 +498,13 @@ export default function App() {
     const targetItem = historyList.find((item) => item.id === transactionId);
     if (!targetItem) return;
 
+    const chairNum = parseInt(chairKey.replace('chair', ''), 10) || 1;
+    const barberName = barberNames[chairKey] || `Poltrona 0${chairNum}`;
+    const origTime = new Date(targetItem.timestamp).toLocaleTimeString('it-IT');
+
     const newHistory = historyList.filter((item) => item.id !== transactionId);
     const newTotal = Math.max(0, currentObj.total - targetItem.amount);
+    const nowIso = new Date().toISOString();
 
     try {
       const chairRef = doc(db, 'chairs', chairKey);
@@ -442,6 +512,27 @@ export default function App() {
         total: newTotal,
         updatedAt: serverTimestamp(),
         history: newHistory,
+      });
+
+      // 1. Notifica nel pannello di amministrazione
+      await appendNotification({
+        title: 'Incasso Eliminato',
+        message: `Eliminato incasso di +${targetItem.amount}€ registrato da ${barberName} (Postazione 0${chairNum}) alle ore ${origTime}.`,
+        timestamp: nowIso,
+        read: false,
+        type: 'error',
+      });
+
+      // 2. Registra nel log giornaliero
+      await appendAuditLog({
+        action: 'delete',
+        chairKey,
+        chairNum,
+        barberName,
+        amount: targetItem.amount,
+        timestamp: nowIso,
+        details: `Incasso di +${targetItem.amount}€ eliminato (registrato da ${barberName} alle ore ${origTime})`,
+        performedBy: 'admin',
       });
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `chairs/${chairKey}`);
@@ -455,14 +546,19 @@ export default function App() {
     const targetItem = historyList.find((item) => item.id === transactionId);
     if (!targetItem) return;
 
+    const chairNum = parseInt(chairKey.replace('chair', ''), 10) || 1;
+    const barberName = barberNames[chairKey] || `Poltrona 0${chairNum}`;
+    const origTime = new Date(targetItem.timestamp).toLocaleTimeString('it-IT');
+
     const diff = newAmount - targetItem.amount;
     const newTotal = Math.max(0, currentObj.total + diff);
+    const nowIso = new Date().toISOString();
     const newHistory = historyList.map((item) => {
       if (item.id === transactionId) {
         return {
           ...item,
           amount: newAmount,
-          updatedAt: new Date().toISOString(),
+          updatedAt: nowIso,
         };
       }
       return item;
@@ -474,6 +570,29 @@ export default function App() {
         total: newTotal,
         updatedAt: serverTimestamp(),
         history: newHistory,
+      });
+
+      // 1. Notifica nel pannello di amministrazione
+      await appendNotification({
+        title: 'Incasso Modificato',
+        message: `Incasso di ${barberName} (Postazione 0${chairNum}) modificato: da ${targetItem.amount}€ a ${newAmount}€ (${diff >= 0 ? '+' : ''}${diff}€).`,
+        timestamp: nowIso,
+        read: false,
+        type: 'warning',
+      });
+
+      // 2. Registra nel log giornaliero
+      await appendAuditLog({
+        action: 'edit',
+        chairKey,
+        chairNum,
+        barberName,
+        oldAmount: targetItem.amount,
+        newAmount,
+        amount: newAmount,
+        timestamp: nowIso,
+        details: `Importo modificato da ${targetItem.amount}€ a ${newAmount}€ (${diff >= 0 ? '+' : ''}${diff}€) per ${barberName} (Postazione 0${chairNum})`,
+        performedBy: 'admin',
       });
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `chairs/${chairKey}`);
@@ -493,6 +612,7 @@ export default function App() {
 
   const handleResetDailyData = async () => {
     const chairKeys = Object.keys(barberNames).filter(k => k.startsWith('chair'));
+    const nowIso = new Date().toISOString();
     for (const chairKey of chairKeys) {
       try {
         const chairRef = doc(db, 'chairs', chairKey);
@@ -505,6 +625,22 @@ export default function App() {
         handleFirestoreError(err, OperationType.UPDATE, `chairs/${chairKey}`);
       }
     }
+
+    // Registra reset nel log giornaliero e notifica
+    await appendAuditLog({
+      action: 'reset',
+      timestamp: nowIso,
+      details: 'Reset generale cassa e storico di tutte le poltrone eseguito',
+      performedBy: 'admin',
+    });
+
+    await appendNotification({
+      title: 'Reset Cassa Eseguito',
+      message: 'Il totale di tutte le poltrone e la cassa giornaliera sono stati azzerati con successo.',
+      timestamp: nowIso,
+      read: false,
+      type: 'warning',
+    });
   };
 
   const formattedHeaderDate = new Date().toLocaleDateString('it-IT', {
@@ -649,6 +785,8 @@ export default function App() {
                   onClearNotifications={handleClearNotifications}
                   onDeleteTransaction={handleDeleteTransaction}
                   onEditTransaction={handleEditTransaction}
+                  auditLogs={auditLogs}
+                  onClearAuditLogs={handleClearAuditLogs}
                 />
               </div>
             ) : null}

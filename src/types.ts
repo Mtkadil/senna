@@ -53,6 +53,22 @@ export interface AppNotification {
   type: 'info' | 'success' | 'warning' | 'error';
 }
 
+export type AuditActionType = 'insert' | 'edit' | 'delete' | 'reset';
+
+export interface AuditLogEntry {
+  id: string;
+  action: AuditActionType;
+  chairKey?: string;
+  chairNum?: number;
+  barberName?: string;
+  amount?: number;
+  oldAmount?: number;
+  newAmount?: number;
+  timestamp: string;
+  details: string;
+  performedBy: 'operatore' | 'admin';
+}
+
 export type ScreenType = 'home-screen' | 'selection-screen' | 'chair-screen' | 'admin-dashboard';
 
 export enum OperationType {
